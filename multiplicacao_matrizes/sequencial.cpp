@@ -74,30 +74,26 @@ int main(int argc, char* argv[]) {
     }
 
     // Realizar a multiplicação das matrizes 10 vezes
-    for (int iteracao = 1; iteracao <= 10; ++iteracao) {
-        auto inicio = chrono::steady_clock::now();
+   
+    auto inicio = chrono::steady_clock::now();
 
-        vector<vector<int>> resultado = multiplicarMatrizes(matriz1, matriz2);
+    vector<vector<int>> resultado = multiplicarMatrizes(matriz1, matriz2);
 
-        auto fim = chrono::steady_clock::now();
-        auto duracao = chrono::duration_cast<chrono::milliseconds>(fim - inicio).count();
+    auto fim = chrono::steady_clock::now();
+    auto duracao = chrono::duration_cast<chrono::milliseconds>(fim - inicio).count();
 
-        arquivoResultado << "Iteração " << iteracao << ": Tempo de execução = " << duracao << "ms" << endl;
-
-        // Se for a última iteração, também salvar o resultado da multiplicação
-        if (iteracao == 10) {
-            arquivoResultado << "Resultado da multiplicação:" << endl;
-            for (const auto& linha : resultado) {
-                for (int valor : linha) {
-                    arquivoResultado << valor << " ";
-                }
-                arquivoResultado << endl;
+    arquivoResultado << "Resultado da multiplicação:" << endl;
+    for (const auto& linha : resultado) {
+        for (int valor : linha) {
+            arquivoResultado << valor << " ";
             }
-        }
+        arquivoResultado << endl;
     }
+        
+    
 
     arquivoResultado.close();
-    cout << "Multiplicação concluída. Resultados salvos em " << arquivoSaida << endl;
+    cout << "Tempo: " << duracao << " [ms]" << endl;
 
     return 0;
 }
