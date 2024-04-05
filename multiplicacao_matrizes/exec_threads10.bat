@@ -15,5 +15,5 @@ set P=%1
 
 rem Loop para executar o programa 10 vezes
 for /l %%i in (1,1,10) do (
-    paralelo_threads %arquivo1% %arquivo2% %P%
+    threads %arquivo1% %arquivo2% %P%
 )
