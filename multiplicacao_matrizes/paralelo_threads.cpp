@@ -8,15 +8,6 @@
 
 using namespace std;
 
-long long CalculaDuracao(vector<thread>& threads) {
-    auto start_time = chrono::high_resolution_clock::now();
-    for (auto& thread_i : threads) {
-        thread_i.join();
-    }
-    auto end_time = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time);
-    return duration.count();
-}
 
 // Estrutura para armazenar os parâmetros de cada thread
 struct ThreadData {
@@ -87,13 +78,15 @@ int main(int argc, char* argv[]) {
     infile1.close();
     infile2.close();
 
-    
 
 
     // Criar threads para calcular a multiplicação de matrizes
     vector<thread> threads;
     vector<vector<int>> result(n1, vector<int>(m2));
     int num_threads = static_cast<int>(ceil(static_cast<double>(n1 * m2) / P));
+
+
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < num_threads; ++i) {
         int start_row = i * P;
@@ -104,8 +97,14 @@ int main(int argc, char* argv[]) {
 
     }
 
+    // Aguarda o término das threads
+    for (auto& thread : threads) {
+        thread.join();
+    }
 
-    long long execution_time = CalculaDuracao(threads);
+    // Finaliza a contagem de tempo
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto execution_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
     
 
@@ -125,7 +124,7 @@ int main(int argc, char* argv[]) {
 
 
     
-    cout << "Tempo: " << execution_time << " [ms]" << endl;
+    cout << "Tempo: " << execution_time.count() << " [ms]" << endl;
     
 
     return 0;
