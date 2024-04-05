@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <Windows.h>
 #include <string>
+#include "paralelo_processos.h"
 
 using namespace std;
 
@@ -112,7 +113,7 @@ void multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vecto
 
         // Criando novo processo filho
         PROCESS_INFORMATION pi;
-        STARTUPINFO si;
+        STARTUPINFOW si;
         ZeroMemory(&pi, sizeof(pi));
         ZeroMemory(&si, sizeof(si));
         si.cb = sizeof(si);
@@ -147,4 +148,16 @@ void multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vecto
         }
         
     }
+}
+
+int main() {
+
+    // Lendo matrizes de arquivos
+    vector<vector<int>> matriz1p = lerMatrizDoArquivo("matriz1p.txt");
+    vector<vector<int>> matriz2p = lerMatrizDoArquivo("matriz2p.txt");
+
+    // Multiplicando matrizes em paralelo com 4 processos
+    multiplicarMatrizesParalelo(matriz1p, matriz2p, 4);
+
+    return 0;
 }
