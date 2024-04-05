@@ -117,11 +117,14 @@ void multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vecto
         ZeroMemory(&si, sizeof(si));
         si.cb = sizeof(si);
 
-        string command = "paralelo_processos_filho.exe " + std::to_string(start_row) + " " + std::to_string(end_row);
-        char* writable_command = strdup(command.c_str());
+        // Definindo a string normal
+        string command = "paralelo_processos_filho.exe" + std::to_string(start_row) + " " + std::to_string(end_row);
 
-        if (!CreateProcess(NULL, writable_command, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
-            cerr <"Erro ao criar o processo filho." << endl;
+        // Convertendo string normal para wide string
+        wstring wide_command(command.begin(), command.end()); 
+
+        if (!CreateProcessW(NULL, const_cast<LPWSTR>(wide_command.c_str()), NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
+            cerr << "Erro ao criar o processo filho." << endl;
             exit(1);
         }
 
@@ -131,11 +134,17 @@ void multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vecto
         // Obtendo o tempo de execução do processo
         long long tempo_execucao = calcularTempoDecorrido(start_time);
 
+        // Escrevendo o tempo de execução em um array
+        tempos_execucao[i] = tempo_execucao;
+
         // Fechando identificadores de processo
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
 
-        // Escrevendo o tempo de execução em um array
-        tempos_execucao[i] = tempo_execucao;
+        // Verificando os tempos de execução de cada bloco
+        for (int i = 0; i < num_blocos; i++) {
+            cout <<"Tempo de execução do bloco " <<i<< ": " << tempos_execucao[i] << "ms" << endl;
+        }
+        
     }
 }
