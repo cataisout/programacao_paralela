@@ -4,9 +4,12 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <sstream>
+#include <iomanip>
 #include <Windows.h>
 #include <string>
 #include "paralelo_processos.h"
+
 
 using namespace std;
 
@@ -19,23 +22,23 @@ long long calcularTempoDecorrido(const chrono::steady_clock::time_point& start_t
 }
 
 // Multiplicar duas matrizes
-vector<vector<int>> multiplicarMatrizes(const vector<vector<int>>& matriz1, const vector<vector<int>>& matriz2) {
+vector<vector<int>> multiplicarMatrizes(const vector<vector<int>>& matriz1, const vector<vector<int>>& matriz2, int start_row, int end_row) {
     int linhas1 = matriz1.size();
     int colunas1 = matriz1[0].size();
     int linhas2 = matriz2.size();
     int colunas2 = matriz2[0].size();
 
     if (colunas1 != linhas2) {
-        cerr << "Erro: O número de linhas e colunas não permite a multiplicação!" <<endl;
+        cerr << "Erro: O número de linhas e colunas não permite a multiplicação!" << endl;
         exit(1);
     }
 
-    vector<vector<int>> resultado(linhas1, vector<int>(colunas2, 0));
+    vector<vector<int>> resultado(end_row - start_row, vector<int>(colunas2, 0));
 
-    for (int i = 0; i <linhas1; i++) {
+    for (int i = start_row; i < end_row; i++) {
         for (int j = 0; j < colunas2; j++) {
             for (int k = 0; k < colunas1; k++) {
-                resultado[i][j] += matriz1[i][k] * matriz2[k][j];
+                resultado[i - start_row][j] += matriz1[i][k] * matriz2[k][j];
             }
         }
     }
@@ -93,7 +96,64 @@ void escreverMatrizNoArquivo(const vector<vector<int>>& matriz, const string& no
 }
 
 // Multiplicando matrizes em paralelo usando processos
-void multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vector<vector<int>>& matriz2, int P) {
+vector<ResultadoParte> multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vector<vector<int>>& matriz2, int P) {
+    int n1 = matriz1.size();
+    int n2 = matriz2[0].size();
+    int num_blocos = static_cast<int>(ceil(static_cast<double>(n1) / P));
+
+    // Armazenando os IDs dos processos filhos
+    HANDLE* child_handles = new HANDLE[num_blocos];
+
+    // Armazenando os resultados de cada parte
+    vector<ResultadoParte> resultados(num_blocos);
+
+    // Dividindo a multiplicação das matrizes em partes e criando um novo processo para cada parte
+    for (int i = 0; i < num_blocos; i++) {
+        auto start_time = chrono::steady_clock::now();
+        
+        int start_row = i * P;
+        int end_row = min((i + 1) * P, n1);
+
+        // Criando novo processo filho
+        PROCESS_INFORMATION pi;
+        STARTUPINFOW si;
+
+        ZeroMemory(&pi, sizeof(pi));
+        ZeroMemory(&si, sizeof(si));
+
+        si.cb = sizeof(si);
+
+        // Construindo o comando para o processo filho 
+        stringstream ss;
+        ss << "paralelo_processos_filho.exe " << start_row << " " << end_row;
+        string command = ss.str();
+        wstring wide_command(command.begin(), command.end());
+
+        // Criando processo filho 
+        if (!CreateProcessW (NULL, const_cast<LPWSTR>(wide_command.c_str()), NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
+            cerr << "Erro ao criar o processo filho!" << endl;
+            exit(1);
+        }
+
+        // Aguardando terminar o processo filho
+        WaitForSingleObject(pi.hProcess, INFINITE);
+
+        // Pegando tempo de execução do processo
+        long long tempo_execucao = calcularTempoDecorrido(start_time);
+
+        // Armazenando o resultado e o tempo de execução da parte também
+        vector<vector<int>> resultado = lerMatrizDoArquivo("resultado_" + to_string(start_row) + "_" + to_string(end_row) + ".txt");
+        resultados[i] = {resultado, tempo_execucao};
+
+        // Fechando identificadores de processo
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+
+    }
+    return resultados;
+}
+
+/*void multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vector<vector<int>>& matriz2, int P) {
     int n1 = matriz1.size();
     int n2 = matriz2[0].size();
     int num_blocos = static_cast<int>(ceil(static_cast<double>(n1 * n2) / P));
@@ -148,7 +208,7 @@ void multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vecto
         }
         
     }
-}
+}*/
 
 int main() {
 
