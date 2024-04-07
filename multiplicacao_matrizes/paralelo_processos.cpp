@@ -1,223 +1,119 @@
 #include <iostream>
-#include <fstream>
 #include <vector>
-#include <chrono>
-#include <cmath>
-#include <cstdlib>
+#include <fstream>
+#include <windows.h> 
 #include <sstream>
-#include <iomanip>
-#include <Windows.h>
-#include <string>
-#include "paralelo_processos.h"
-
 
 using namespace std;
 
-//Calcular o tempo decorrido em milissegundos
-long long calcularTempoDecorrido(const chrono::steady_clock::time_point& start_time) {
-    auto end_time = chrono::steady_clock::now();
-    auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time);
-
-    return duration.count();
-}
-
-// Multiplicar duas matrizes
-vector<vector<int>> multiplicarMatrizes(const vector<vector<int>>& matriz1, const vector<vector<int>>& matriz2, int start_row, int end_row) {
-    int linhas1 = matriz1.size();
-    int colunas1 = matriz1[0].size();
-    int linhas2 = matriz2.size();
-    int colunas2 = matriz2[0].size();
-
-    if (colunas1 != linhas2) {
-        cerr << "Erro: O número de linhas e colunas não permite a multiplicação!" << endl;
-        exit(1);
-    }
-
-    vector<vector<int>> resultado(end_row - start_row, vector<int>(colunas2, 0));
-
-    for (int i = start_row; i < end_row; i++) {
-        for (int j = 0; j < colunas2; j++) {
-            for (int k = 0; k < colunas1; k++) {
-                resultado[i - start_row][j] += matriz1[i][k] * matriz2[k][j];
-            }
-        }
-    }
-
-    return resultado;
-}
-
-// Ler matriz de um arquivo
 vector<vector<int>> lerMatrizDoArquivo(const string& nomeArquivo) {
-    ifstream arquivo(nomeArquivo);
-
-    if(!arquivo.is_open()) {
-        cerr << "Erro ao abrir o arquivo." << nomeArquivo << endl;
-        exit(1);
-    }
-
+    ifstream infile(nomeArquivo);
+    
     int linhas, colunas;
-    arquivo >> linhas >> colunas;
-
+    infile >> linhas >> colunas;
+    
     vector<vector<int>> matriz(linhas, vector<int>(colunas));
-
-    for (int i = 0; i < linhas; i++) {
-        for (int j = 0; j < colunas; j++) {
-            arquivo >> matriz[i][j];
+    
+    for (int i = 0; i < linhas; ++i) {
+        for (int j = 0; j < colunas; ++j) {
+            infile >> matriz[i][j];
         }
     }
-
-    arquivo.close();
-
+    
+    infile.close();
+    
     return matriz;
 }
 
-// Escrever matriz em um arquivo
-void escreverMatrizNoArquivo(const vector<vector<int>>& matriz, const string& nomeArquivo) {
-    ofstream arquivo(nomeArquivo);
+void multiplyRows(const vector<vector<int>>& matriz1, const vector<vector<int>>& matriz2, vector<vector<int>>& result, int start_row, int end_row) {
+    int n1 = matriz1.size();
+    int m2 = matriz2[0].size();
+    int m1 = matriz1[0].size();
 
-    if(!arquivo.is_open()) {
-        cerr << "Erro ao criar o arquivo." << nomeArquivo << endl;
-        exit(1);
-    }
-
-    int linhas = matriz.size();
-    int colunas = matriz[0].size();
-
-    arquivo << linhas << " " << colunas << endl;
-
-    for (int i = 0; i < linhas; i++) {
-        for (int j = 0; j < colunas; j++) {
-            arquivo << matriz[i][j] << " ";
+    for (int i = start_row; i < end_row; ++i) {
+        for (int j = 0; j < m2; ++j) {
+            result[i][j] = 0;
+            for (int k = 0; k < m1; ++k) {
+                result[i][j] += matriz1[i][k] * matriz2[k][j];
+            }
         }
-        arquivo << endl;
     }
-
-    arquivo.close();
 }
 
-// Multiplicando matrizes em paralelo usando processos
-vector<ResultadoParte> multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vector<vector<int>>& matriz2, int P) {
-    int n1 = matriz1.size();
-    int n2 = matriz2[0].size();
-    int num_blocos = static_cast<int>(ceil(static_cast<double>(n1) / P));
+void saveResultToFile(const vector<vector<int>>& result, const string& filename) {
+    ofstream file(filename);
+    if (file.is_open()) {
+        int n = result.size(); 
+        int m = result[0].size(); 
 
-    // Armazenando os IDs dos processos filhos
-    HANDLE* child_handles = new HANDLE[num_blocos];
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < m; ++j) {
+                file << result[i][j] << " ";
+            }
+            file << endl;
+        }
+        file.close();
+    }
+}
 
-    // Armazenando os resultados de cada parte
-    vector<ResultadoParte> resultados(num_blocos);
+int main(int argc, char *argv[]) {
+    if (argc < 4) {
+        cerr << "Uso: " << argv[0] << " arquivo1 arquivo2 P" << endl;
+        return 1;
+    }
 
-    // Dividindo a multiplicação das matrizes em partes e criando um novo processo para cada parte
-    for (int i = 0; i < num_blocos; i++) {
-        auto start_time = chrono::steady_clock::now();
-        
-        int start_row = i * P;
-        int end_row = min((i + 1) * P, n1);
+    string file1 = argv[1];
+    string file2 = argv[2];
+    int P = atoi(argv[3]);
 
-        // Criando novo processo filho
+    ifstream infile1(file1);
+    ifstream infile2(file2);
+
+    int n1, m1, n2, m2;
+
+    infile1 >> n1 >> m1;
+    infile2 >> n2 >> m2;
+    infile1.close();
+    infile2.close();
+
+    vector<vector<int>> matriz1 = lerMatrizDoArquivo(file1);
+    vector<vector<int>> matriz2 = lerMatrizDoArquivo(file2);
+
+    vector<vector<int>> result(n1, vector<int>(m2));
+
+    int rows_per_process = (n1 + P - 1) / P; 
+    int process_count = 0;
+
+    DWORD start_time = GetTickCount();
+
+    for (int i = 0; i < P; ++i) {
+        STARTUPINFO si;
         PROCESS_INFORMATION pi;
-        STARTUPINFOW si;
-
-        ZeroMemory(&pi, sizeof(pi));
         ZeroMemory(&si, sizeof(si));
-
+        ZeroMemory(&pi, sizeof(pi));
         si.cb = sizeof(si);
 
-        // Construindo o comando para o processo filho 
-        stringstream ss;
-        ss << "paralelo_processos_filho.exe " << start_row << " " << end_row;
-        string command = ss.str();
-        wstring wide_command(command.begin(), command.end());
+        string command = "\"" + string(argv[0]) + "\" " + file1 + " " + file2 + " 1 " + to_string(process_count * rows_per_process) + " " + to_string(min((process_count + 1) * rows_per_process, n1));
+        wstring wideCommand(command.begin(), command.end());
 
-        // Criando processo filho 
-        if (!CreateProcessW (NULL, const_cast<LPWSTR>(wide_command.c_str()), NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
-            cerr << "Erro ao criar o processo filho!" << endl;
-            exit(1);
+        if (!CreateProcess(NULL, &wideCommand[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+            cerr << "Erro ao criar processo." << endl;
+            return 1;
         }
 
-        // Aguardando terminar o processo filho
-        WaitForSingleObject(pi.hProcess, INFINITE);
-
-        // Pegando tempo de execução do processo
-        long long tempo_execucao = calcularTempoDecorrido(start_time);
-
-        // Armazenando o resultado e o tempo de execução da parte também
-        vector<vector<int>> resultado = lerMatrizDoArquivo("resultado_" + to_string(start_row) + "_" + to_string(end_row) + ".txt");
-        resultados[i] = {resultado, tempo_execucao};
-
-        // Fechando identificadores de processo
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
 
+        process_count++;
     }
-    return resultados;
-}
 
-/*void multiplicarMatrizesParalelo(const vector<vector<int>>& matriz1, const vector<vector<int>>& matriz2, int P) {
-    int n1 = matriz1.size();
-    int n2 = matriz2[0].size();
-    int num_blocos = static_cast<int>(ceil(static_cast<double>(n1 * n2) / P));
+    DWORD end_time = GetTickCount();
+    DWORD execution_time = end_time - start_time;
 
-    // Armazenando os IDs os processos filhos
-    HANDLE* child_handles = new HANDLE[num_blocos];
+    string resultfile = "resultado.txt";
+    saveResultToFile(result, resultfile);
 
-    // Armazenando os tempos de execução dos processos
-    long long* tempos_execucao = new long long[num_blocos];
-
-    // Dividindo a multiplicação das matrizes em partes, onde cada parte contém P elementos da matriz resultante
-    for (int i = 0; i < num_blocos; i++) {
-        auto start_time = chrono::steady_clock::now();
-
-        int start_row = i * P;
-        int end_row = min((i + 1) * P, n1);
-
-        // Criando novo processo filho
-        PROCESS_INFORMATION pi;
-        STARTUPINFOW si;
-        ZeroMemory(&pi, sizeof(pi));
-        ZeroMemory(&si, sizeof(si));
-        si.cb = sizeof(si);
-
-        // Definindo a string normal
-        string command = "paralelo_processos_filho.exe" + std::to_string(start_row) + " " + std::to_string(end_row);
-
-        // Convertendo string normal para wide string
-        wstring wide_command(command.begin(), command.end()); 
-
-        if (!CreateProcessW(NULL, const_cast<LPWSTR>(wide_command.c_str()), NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
-            cerr << "Erro ao criar o processo filho." << endl;
-            exit(1);
-        }
-
-        // Aguardando a conclusão do processo filho
-        WaitForSingleObject(pi.hProcess, INFINITE);
-
-        // Obtendo o tempo de execução do processo
-        long long tempo_execucao = calcularTempoDecorrido(start_time);
-
-        // Escrevendo o tempo de execução em um array
-        tempos_execucao[i] = tempo_execucao;
-
-        // Fechando identificadores de processo
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-
-        // Verificando os tempos de execução de cada bloco
-        for (int i = 0; i < num_blocos; i++) {
-            cout <<"Tempo de execução do bloco " <<i<< ": " << tempos_execucao[i] << "ms" << endl;
-        }
-        
-    }
-}*/
-
-int main() {
-
-    // Lendo matrizes de arquivos
-    vector<vector<int>> matriz1p = lerMatrizDoArquivo("matriz1p.txt");
-    vector<vector<int>> matriz2p = lerMatrizDoArquivo("matriz2p.txt");
-
-    // Multiplicando matrizes em paralelo com 4 processos
-    multiplicarMatrizesParalelo(matriz1p, matriz2p, 4);
+    cout << execution_time << endl;
 
     return 0;
 }
